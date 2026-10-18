@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 /**
  * Atomic, database-backed counter. Tattoo numbers come from $inc on a single
- * document, so concurrent inserts never get the same number and numbers of
- * deleted tattoos are never reused.
+ * document, so concurrent inserts never get the same number. The counter
+ * resets when the final tattoo is deleted.
  */
 const counterSchema = new mongoose.Schema({
   _id: { type: String, required: true },

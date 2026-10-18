@@ -109,7 +109,7 @@ In development Vite proxies `/api` and `/uploads` to port 5000, so the browser o
 
 ## 2. How things work
 
-- **Tattoo numbers** come from an atomic counter document (`Counter` collection, `$inc` + upsert). They are unique even under concurrent inserts, never change on edit (the field is `immutable`) and are **never reused** after a delete.
+- **Tattoo numbers** come from an atomic counter document (`Counter` collection, `$inc` + upsert). They are unique even under concurrent inserts and never change on edit (the field is `immutable`). Deleting individual tattoos does not reset numbering; deleting the final tattoo resets the next number to `#001`.
 - **Public visibility:** only tattoos with `isActive: true` in an active category are returned by the public API. Inactive or deleted tattoos disappear.
 - **Auto-updates:** public pages fetch from the API on load and on every category/search change, poll every 10–15 s while the tab is visible, and refetch when the tab regains focus. The API sends `Cache-Control: no-store`. A failed background refresh keeps the last good data on screen.
 - **Selections** live in `localStorage`. The Selection page re-checks every selected tattoo against the API, so price changes are reflected and tattoos deleted by the admin are flagged "No longer available" and excluded from the total (nothing breaks).
@@ -180,7 +180,7 @@ Run through these after setup (≈10 minutes). Each should behave as described.
 | 12 | Edit a tattoo's name, price, category, image | Saved; **number unchanged** |
 | 13 | Toggle a tattoo Inactive | It disappears from the public gallery (within ~10 s, or on reload) |
 | 14 | Change a category's starting price in Manage Prices | Public category card updates |
-| 15 | Delete a tattoo → confirm | Gone from admin and public; add a new one — the deleted number is **not** reused |
+| 15 | Delete a tattoo → confirm | Gone from admin and public; individual deletions keep the sequence, while deleting the final tattoo resets the next number to `#001` |
 | 16 | Delete a category that has tattoos | Rejected with an explanatory message |
 | 17 | Upload a `.pdf`/`.txt`, a renamed non-image file, or an image over 5 MB | Rejected with an error |
 | 18 | Submit the tattoo form with empty name or negative price | Validation messages |

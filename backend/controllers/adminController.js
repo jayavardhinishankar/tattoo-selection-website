@@ -1,6 +1,6 @@
 const Tattoo = require('../models/Tattoo');
 const TattooCategory = require('../models/TattooCategory');
-const { nextSequence } = require('../models/Counter');
+const { Counter, nextSequence } = require('../models/Counter');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const {
@@ -171,7 +171,13 @@ exports.deleteTattoo = asyncHandler(async (req, res) => {
   requireObjectId(req.params.id, 'tattoo id');
   const tattoo = await Tattoo.findByIdAndDelete(req.params.id);
   if (!tattoo) throw new ApiError(404, 'Tattoo not found');
-  // The counter is never decremented, so this number will not be reused.
+  if (!(await Tattoo.exists({}))) {
+    await Counter.findOneAndUpdate(
+      { _id: 'tattooNumber' },
+      { $set: { seq: 0 } },
+      { upsert: true }
+    );
+  }
   await deleteImage(tattoo.imagePublicId);
   res.json({ success: true, message: `Tattoo #${String(tattoo.tattooNumber).padStart(3, '0')} deleted` });
 });
