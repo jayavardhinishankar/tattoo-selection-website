@@ -37,7 +37,7 @@ const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
 const frontendIndex = path.join(frontendDist, 'index.html');
 
 app.get('/', (_req, res, next) => {
-  if (process.env.NODE_ENV === 'production' && fs.existsSync(frontendIndex)) {
+  if (fs.existsSync(frontendIndex)) {
     return res.sendFile(frontendIndex, (err) => {
       if (err) next(err);
     });
@@ -65,7 +65,7 @@ app.use('/api', publicRoutes);
 app.use('/api', customerRoutes);
 app.use('/api/admin', adminRoutes);
 
-if (process.env.NODE_ENV === 'production' && fs.existsSync(frontendDist)) {
+if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist, { maxAge: '1d', index: false }));
   app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (_req, res, next) => {
     res.sendFile(frontendIndex, (err) => {
