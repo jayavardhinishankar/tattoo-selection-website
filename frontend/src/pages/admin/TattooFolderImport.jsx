@@ -47,6 +47,21 @@ export default function TattooFolderImport({ categories, initialCategoryId }) {
           }
         } catch (err) {
           if (runRef.current === runId) {
+            if (
+              err.response?.status === 503 &&
+              err.response?.data?.message === 'AI name suggestions are not configured. Add GEMINI_API_KEY to the backend environment.'
+            ) {
+              runRef.current += 1;
+              setGenerating(false);
+              setNotice({
+                type: 'info',
+                text: 'AI name suggestions are not configured. Names were filled from filenames; review or edit them and continue importing, or configure GEMINI_API_KEY in Render.',
+              });
+              setImages((current) => current.map((image) =>
+                image.status === 'imported' ? image : { ...image, aiStatus: 'unavailable', aiError: '' }
+              ));
+              return;
+            }
             setImages((current) => current.map((image) =>
               image.id === item.id
                 ? { ...image, aiStatus: 'failed', aiError: errorMessage(err, 'AI name suggestion failed.') }
@@ -186,7 +201,7 @@ export default function TattooFolderImport({ categories, initialCategoryId }) {
                 <div>
                   <strong>{item.file.webkitRelativePath || item.file.name}</strong>
                   <small>
-                    {item.status === 'imported' ? 'Added' : item.status === 'uploading' ? 'Adding…' : item.importError || item.aiError || (item.aiStatus === 'generating' ? 'AI naming…' : item.aiStatus === 'suggested' ? 'AI name suggested — review it' : 'Name can be edited')}
+                    {item.status === 'imported' ? 'Added' : item.status === 'uploading' ? 'Adding…' : item.importError || item.aiError || (item.aiStatus === 'generating' ? 'AI naming…' : item.aiStatus === 'suggested' ? 'AI name suggested — review it' : item.aiStatus === 'unavailable' ? 'AI unavailable — review the filename-based name' : 'Name can be edited')}
                   </small>
                 </div>
                 <label className="field">
