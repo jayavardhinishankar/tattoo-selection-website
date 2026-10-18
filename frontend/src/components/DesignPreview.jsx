@@ -5,12 +5,19 @@ export function fontFamilyCss(family, category) {
   return `'${family.replace(/['\\]/g, '')}', ${fallback}`;
 }
 
+export function fontStylesheetUrl(family) {
+  return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, '+')}&display=swap`;
+}
+
 export default function DesignPreview({ design, className = '' }) {
   useEffect(() => {
     if (design.fontCategory === 'Installed system fonts') return undefined;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(design.fontFamily).replace(/%20/g, '+')}&display=swap`;
+    link.href = fontStylesheetUrl(design.fontFamily);
+    link.dataset.fontStylesheet = 'loading';
+    link.addEventListener('load', () => { link.dataset.fontStylesheet = 'loaded'; }, { once: true });
+    link.addEventListener('error', () => { link.dataset.fontStylesheet = 'error'; }, { once: true });
     document.head.appendChild(link);
     return () => link.remove();
   }, [design.fontCategory, design.fontFamily]);

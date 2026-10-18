@@ -1,12 +1,45 @@
 import { useEffect, useState } from 'react';
 import usePolling from '../../hooks/usePolling';
-import DesignPreview from '../../components/DesignPreview';
+import DesignPreview, { fontFamilyCss, fontStylesheetUrl } from '../../components/DesignPreview';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Spinner from '../../components/Spinner';
 import StateMessage, { Notice } from '../../components/StateMessage';
 import { adminApi, errorMessage } from '../../services/api';
 
 const statuses = ['pending', 'reviewing', 'approved', 'rejected', 'completed'];
+const fontStylesheetLoads = new Map();
+
+function imageFilename(request, extension) {
+  const safePart = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/[. ]+$/g, '')
+    .slice(0, 80);
+  const rollNumber = safePart(request.rollNumber);
+  const requestId = safePart(request.requestId) || 'lettering-request';
+  return `${rollNumber || requestId}.${extension}`;
+}
+
+async function ensureFontStylesheet(design) {
+  if (design.fontCategory === 'Installed system fonts') return;
+
+  const href = fontStylesheetUrl(design.fontFamily);
+  if (!fontStylesheetLoads.has(href)) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    fontStylesheetLoads.set(href, new Promise((resolve, reject) => {
+      link.addEventListener('load', resolve, { once: true });
+      link.addEventListener('error', () => {
+        fontStylesheetLoads.delete(href);
+        reject(new Error('Could not load the selected font for image export.'));
+      }, { once: true });
+      document.head.appendChild(link);
+    }));
+  }
+  await fontStylesheetLoads.get(href);
+}
 
 export default function ManageLetteringRequests() {
   const [searchInput, setSearchInput] = useState('');
@@ -91,26 +124,40 @@ export default function ManageLetteringRequests() {
     if (!request) return;
     const link = document.createElement('a');
     link.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(request.svg)}`;
-    link.download = `${request.requestId}.svg`;
+    link.download = imageFilename(request, 'svg');
     link.click();
   };
 
   const downloadJpg = async () => {
     if (!request) return;
-    const svgUrl = URL.createObjectURL(new Blob([request.svg], { type: 'image/svg+xml;charset=utf-8' }));
     try {
-      const image = new Image();
-      image.src = svgUrl;
-      await image.decode();
-
+      const { design } = request;
+      const text = design.letterCase === 'uppercase'
+        ? design.text.toUpperCase()
+        : design.letterCase === 'lowercase'
+          ? design.text.toLowerCase()
+          : design.text;
+      const font = `${design.italic ? 'italic ' : ''}${design.fontWeight} ${design.fontSize}px ${fontFamilyCss(design.fontFamily, design.fontCategory)}`;
+      await ensureFontStylesheet(design);
+      const loadedFonts = await document.fonts.load(font, text);
+      await document.fonts.ready;
+      if (design.fontCategory !== 'Installed system fonts' && loadedFonts.length === 0) {
+        throw new Error('The selected font could not be loaded. Check your connection and try again.');
+      }
       const canvas = document.createElement('canvas');
       canvas.width = 1200;
-      canvas.height = Math.max(300, Math.ceil(request.design.fontSize * request.design.lineSpacing + 100));
+      canvas.height = Math.max(300, Math.ceil(design.fontSize * design.lineSpacing + 100));
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Your browser could not create a canvas for the JPG image.');
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      context.font = font;
+      context.textAlign = design.alignment;
+      context.textBaseline = 'alphabetic';
+      context.fillStyle = design.color;
+      if ('letterSpacing' in context) context.letterSpacing = `${design.letterSpacing}px`;
+      const x = design.alignment === 'left' ? 40 : design.alignment === 'right' ? canvas.width - 40 : canvas.width / 2;
+      context.fillText(text, x, 50 + design.fontSize);
 
       const jpg = await new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
@@ -121,13 +168,11 @@ export default function ManageLetteringRequests() {
       const jpgUrl = URL.createObjectURL(jpg);
       const link = document.createElement('a');
       link.href = jpgUrl;
-      link.download = `${request.requestId}.jpg`;
+      link.download = imageFilename(request, 'jpg');
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(jpgUrl), 1000);
     } catch (err) {
       setNotice({ type: 'error', text: err.message || 'Could not download the JPG image.' });
-    } finally {
-      URL.revokeObjectURL(svgUrl);
     }
   };
 
