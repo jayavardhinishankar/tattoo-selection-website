@@ -4,7 +4,12 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 async function suggestTattooName({ file, categoryName }) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new ApiError(503, 'AI name suggestions are not configured. Add GEMINI_API_KEY to the backend environment.');
+  if (!apiKey) {
+    throw new ApiError(
+      503,
+      'AI name suggestions are not configured. Add GEMINI_API_KEY to Render to enable them, or continue with filename-based names.'
+    );
+  }
 
   let response;
   try {

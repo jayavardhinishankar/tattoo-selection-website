@@ -49,7 +49,7 @@ export default function TattooFolderImport({ categories, initialCategoryId }) {
           if (runRef.current === runId) {
             if (
               err.response?.status === 503 &&
-              err.response?.data?.message === 'AI name suggestions are not configured. Add GEMINI_API_KEY to the backend environment.'
+              err.response?.data?.message?.startsWith('AI name suggestions are not configured.')
             ) {
               runRef.current += 1;
               setGenerating(false);
