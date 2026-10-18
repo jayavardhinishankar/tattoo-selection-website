@@ -13,6 +13,17 @@ const {
 const { saveImage, deleteImage, hasImageSignature } = require('../services/imageService');
 const { suggestTattooName: suggestNameWithGemini } = require('../services/geminiService');
 
+async function nextTattooNumber() {
+  if (!(await Tattoo.exists({}))) {
+    await Counter.findOneAndUpdate(
+      { _id: 'tattooNumber' },
+      { $set: { seq: 0 } },
+      { upsert: true }
+    );
+  }
+  return nextSequence('tattooNumber');
+}
+
 /* ------------------------------ Dashboard ------------------------------ */
 
 exports.dashboard = asyncHandler(async (_req, res) => {
@@ -102,19 +113,37 @@ exports.createTattoo = asyncHandler(async (req, res) => {
   const { imageUrl, imagePublicId } = await saveImage(req.file);
 
   try {
-    const tattooNumber = await nextSequence('tattooNumber');
-    const tattoo = await Tattoo.create({
-      tattooNumber,
-      name,
-      description,
-      price,
-      categoryId,
-      imageUrl,
-      imagePublicId,
-      isActive: isActive === undefined ? true : isActive,
-    });
+    let tattoo;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const tattooNumber = await nextTattooNumber();
+      try {
+        tattoo = await Tattoo.create({
+          tattooNumber,
+          name,
+          description,
+          price,
+          categoryId,
+          imageUrl,
+          imagePublicId,
+          isActive: isActive === undefined ? true : isActive,
+        });
+        break;
+      } catch (err) {
+        if (err.code !== 11000 || !err.keyPattern?.tattooNumber || attempt === 4) throw err;
+        const latest = await Tattoo.findOne().sort({ tattooNumber: -1 }).select('tattooNumber').lean();
+        await Counter.findOneAndUpdate(
+          { _id: 'tattooNumber' },
+          { $max: { seq: (latest && latest.tattooNumber) || 0 } },
+          { upsert: true }
+        );
+      }
+    }
     await tattoo.populate('categoryId', 'name');
-    res.status(201).json({ success: true, message: `Tattoo #${String(tattooNumber).padStart(3, '0')} added`, data: tattoo });
+    res.status(201).json({
+      success: true,
+      message: `Tattoo #${String(tattoo.tattooNumber).padStart(3, '0')} added`,
+      data: tattoo,
+    });
   } catch (err) {
     await deleteImage(imagePublicId); // do not leave orphan files behind
     throw err;
