@@ -15,7 +15,16 @@ const { UPLOAD_DIR } = require('./services/imageService');
 const app = express();
 
 app.disable('x-powered-by');
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+      directives: {
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com'],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: [
